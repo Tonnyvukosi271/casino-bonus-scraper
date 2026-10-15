@@ -114,10 +114,10 @@ Tests use mocked HTTP and language-model responses; they do not need network acc
 
 GitHub Pages can host the front end, but it cannot run the Python scraper or keep an API key secret.
 
-1. Push the project files to a GitHub repository. Confirm `.env` is not included.
+1. Push the project files to the `main` branch of the GitHub repository. Confirm `.env` is not included.
 2. In the repository, open **Settings → Pages**.
-3. Choose **Deploy from a branch**, select `main` and the project root (`/`), then save.
-4. Open the Pages URL after deployment and check that the dataset or empty state loads.
+3. Choose **Deploy from a branch**, select `main` and `/(root)`, then save. GitHub Pages branch publishing supports only the repository root or `/docs`, not this nested project directory. The repository-root `index.html` redirects visitors to this app.
+4. Wait for the Pages deployment to finish. Open `https://<owner>.github.io/<repository>/` and check that the dataset or empty state loads.
 5. Run the scraper locally and publish the updated `casinos.json` whenever you want to refresh the displayed data.
 
 ## Limitations and responsible use

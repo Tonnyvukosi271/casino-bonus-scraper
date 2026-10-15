@@ -83,7 +83,15 @@ Then open:
 http://localhost:8000
 ```
 
-The page loads `casinos.json` and renders the results as a static table or empty state.
+The page loads `casinos.json` and renders the results as a static table or empty state. The repository-root `index.html` redirects visitors to the app in `casino-bonus-scraper/`.
+
+## Publish with GitHub Pages
+
+1. Push the project to the `main` branch and confirm `.env` is not committed.
+2. In the repository, open **Settings → Pages**.
+3. Under **Build and deployment**, choose **Deploy from a branch**.
+4. Select branch `main` and folder `/(root)`, then save. GitHub Pages only offers the repository root or `/docs`; it cannot publish directly from the nested `casino-bonus-scraper/` folder. The root `index.html` forwards visitors to the app.
+5. Wait for the Pages deployment to finish, then open <https://tonnyvukosi271.github.io/casino-bonus-scraper/> and confirm the app loads.
 
 ## Output format
 
