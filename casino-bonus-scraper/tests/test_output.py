@@ -22,12 +22,16 @@ class DatasetTests(unittest.TestCase):
     def test_valid_dataset(self):
         self.assertEqual(scraper.validate_dataset(good_dataset()), [])
 
-    def test_initial_casinos_json_is_valid_and_empty(self):
+    def test_committed_live_casinos_json_is_valid(self):
         path = os.path.join(os.path.dirname(__file__), "..", "casinos.json")
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        self.assertEqual(data["casinos"], [])
-        self.assertIsNone(data["last_updated"])
+        self.assertEqual(scraper.validate_dataset(data), [])
+        self.assertEqual(
+            {record["casino_name"] for record in data["casinos"]},
+            {"Jackpot City", "YesPlay", "Jabulabets"},
+        )
+        self.assertEqual(data["source_url"], "https://www.casino.com/zar/bonuses/")
 
     def test_detects_problems(self):
         data = good_dataset()
@@ -78,6 +82,22 @@ class WriteSafetyTests(unittest.TestCase):
         with open(self.path, encoding="utf-8") as fh:
             statuses = {r["casino_name"]: r["extraction_status"] for r in json.load(fh)["casinos"]}
         self.assertEqual(statuses["Gamma Casino"], "not_found")
+
+    def test_no_ai_run_extracts_explicit_table_values(self):
+        html = """<table><tr><th>Casino</th><th>Welcome Bonus</th></tr>
+          <tr><td>Alpha</td><td>100% up to R1,000</td></tr>
+          <tr><td>Beta</td><td>50 free spins</td></tr>
+          <tr><td>Gamma</td><td>R100 bonus</td></tr></table>"""
+        session = FakeSession({"https://example.com/robots.txt": FakeResponse("User-agent: *\nDisallow:"),
+                               URL: FakeResponse(html)})
+        code = scraper.run(URL, ["Alpha", "Beta", "Gamma"], self.path, "m", "ua",
+                           session=session, use_ai=False)
+        self.assertEqual(code, 2)
+        with open(self.path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        self.assertEqual(data["casinos"][0]["welcome_bonus"], "100% up to R1,000")
+        self.assertIsNone(data["casinos"][0]["minimum_deposit"])
+        self.assertIn("does not state", data["casinos"][0]["notes"])
 
     def test_run_fails_without_writing_on_http_error(self):
         session = FakeSession({"https://example.com/robots.txt": FakeResponse("User-agent: *\nDisallow:"),

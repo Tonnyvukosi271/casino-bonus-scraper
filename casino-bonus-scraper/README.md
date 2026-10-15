@@ -7,8 +7,8 @@ It is deliberately conservative: unsupported values are left blank rather than g
 ## How it works
 
 ```text
-Check robots.txt → fetch one page → extract readable text → find each casino's passage
-→ ask the OpenAI API to structure the terms → validate values → write casinos.json
+Check robots.txt → fetch one page → extract terms with AI or explicit table columns
+→ validate values → write casinos.json
 → display the JSON in the website
 ```
 
@@ -20,6 +20,7 @@ The scraper does not run in the browser. The website only reads `casinos.json`; 
 - Uses a descriptive User-Agent, a 15-second request timeout, and one source-page fetch per run.
 - Matches casino names in page text and separates passages to reduce mixing offers between casinos.
 - Uses the official OpenAI Python SDK in JSON mode to extract three fields.
+- Offers a `--no-ai` mode that reads welcome bonuses, wagering, and minimum deposits only from explicitly labeled table columns; it requires no API key.
 - Checks extracted numbers against the source passage and changes unsupported values to `null`.
 - Validates records before writing; failed or unusable runs leave existing data untouched. Valid output is written atomically.
 - Provides a responsive static page with search, refresh, record status, source links, and empty/error states.
@@ -27,7 +28,7 @@ The scraper does not run in the browser. The website only reads `casinos.json`; 
 ## Requirements
 
 - Python 3.10 or newer
-- An OpenAI API key
+- An OpenAI API key for the default language-model extraction mode (not needed with `--no-ai`)
 - A public page that you are permitted to access automatically
 
 ## Set up
@@ -41,7 +42,7 @@ pip install -r requirements.txt
 cp .env.example .env             # Windows: copy .env.example .env
 ```
 
-Edit `.env` and provide the key, a source URL, and exactly three casino names as they appear on that page:
+Edit `.env` and provide a source URL and exactly three casino names as they appear on that page. The API key is only required for the default AI mode:
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
@@ -66,7 +67,13 @@ You can also pass the source and casino names directly instead of setting them i
 python scraper.py --source-url "https://example.com/promotions" --casinos "Casino A,Casino B,Casino C"
 ```
 
-Other options include `--model`, `--user-agent`, and `--output`. Run `python scraper.py --help` for the full list.
+Use deterministic extraction without an API key:
+
+```bash
+python scraper.py --no-ai --source-url "https://example.com/promotions" --casinos "Casino A,Casino B,Casino C"
+```
+
+In this mode the scraper only records values from table columns explicitly labeled for those terms. Other values remain `null`; it does not infer casino-specific terms from general page text. Other options include `--model`, `--user-agent`, and `--output`. Run `python scraper.py --help` for the full list.
 
 Exit codes:
 
@@ -82,7 +89,7 @@ From the project directory, start a local static server:
 python -m http.server 8000
 ```
 
-Open <http://localhost:8000>. Do not open `index.html` directly with `file://`; browsers block the page's `fetch()` request for `casinos.json`. The initial dataset is empty, so the page will show its “No verified records yet” message until a successful scrape writes usable records.
+Open <http://localhost:8000>. Do not open `index.html` directly with `file://`; browsers block the page's `fetch()` request for `casinos.json`. The page shows “No verified records yet” until a successful scrape writes usable records.
 
 ## Data format
 
@@ -90,7 +97,7 @@ Open <http://localhost:8000>. Do not open `index.html` directly with `file://`; 
 
 | Field | Description |
 |---|---|
-| `last_updated` | UTC timestamp for the last successful write, or `null` in the initial empty file |
+| `last_updated` | UTC timestamp for the last successful write, or `null` before the first scrape |
 | `source_url` | Source page used for the run |
 | `casinos` | Array of records, one per requested name |
 | `casino_name` | Casino name as supplied |
@@ -100,7 +107,7 @@ Open <http://localhost:8000>. Do not open `index.html` directly with `file://`; 
 | `extraction_status` | `complete`, `partial`, `not_found`, or `failed` |
 | `notes` | Explanation for dropped values or extraction errors |
 
-Each casino record also includes its own `source_url`. See [`casinos.json`](./casinos.json) for the initial empty dataset.
+Each casino record also includes its own `source_url`. See [`casinos.json`](./casinos.json) for the current dataset.
 
 ## Tests
 
@@ -122,11 +129,11 @@ GitHub Pages can host the front end, but it cannot run the Python scraper or kee
 
 ## Limitations and responsible use
 
-- No live scrape or live OpenAI request has been verified against a real source; the pipeline has been tested with local fixtures and mocked model calls.
+- A live no-AI extraction has been verified against Casino.com's South African casino bonuses page. Its robots.txt allows the page path; the legacy terms-and-conditions URL redirects to the About page, which includes an affiliate disclosure, and no standalone terms-of-use page was found. No live OpenAI request has been made.
 - Only static HTML pages are supported. JavaScript-rendered offers are not fetched.
 - Casino matching depends on names appearing in the page text. Unusual page layouts may result in `not_found` or partial records.
 - Model output can still misread terms. The number check is a safeguard, not proof of accuracy; verify each offer against the linked operator page.
-- Wagering requirements are normalized to a multiplier where recognized. More complex wording may be ambiguous.
+- In `--no-ai` mode, wagering requirements and minimum deposits are recorded only when the source has corresponding labeled table columns. This source's bonuses table does not provide those casino-specific terms, so those fields remain unavailable.
 - Promotion terms can change. Treat the dataset as informational, verify current terms with the operator, and follow local age and gambling laws.
 
 ## Troubleshooting

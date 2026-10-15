@@ -68,6 +68,37 @@ class SnippetTests(unittest.TestCase):
         self.assertEqual(text, "Hello")
 
 
+class NoAiTableTests(unittest.TestCase):
+    def test_extracts_only_explicit_table_values(self):
+        html = """
+        <table>
+          <thead><tr><th>Casino</th><th>Welcome Bonus</th><th>Best For</th></tr></thead>
+          <tbody>
+            <tr><td>Jackpot City</td><td>R2,000 Match Bonus Or Up To 350 Free Spins</td><td>Flexible bonus choice</td></tr>
+            <tr><td>YesPlay</td><td>100% First Deposit Bonus</td><td>Fast withdrawals</td></tr>
+            <tr><td>Jabulabets</td><td>Up To R30,000 + 245 Free Spins</td><td>Biggest bonus value</td></tr>
+          </tbody>
+        </table>
+        """
+        records = scraper.extract_bonus_table(html, ["Jackpot City", "YesPlay", "Jabulabets"])
+        self.assertEqual(records["Jackpot City"]["welcome_bonus"], "R2,000 Match Bonus Or Up To 350 Free Spins")
+        self.assertEqual(records["YesPlay"]["welcome_bonus"], "100% First Deposit Bonus")
+        self.assertEqual(records["Jabulabets"]["welcome_bonus"], "Up To R30,000 + 245 Free Spins")
+        self.assertTrue(all(record["wagering_requirement"] is None for record in records.values()))
+        self.assertTrue(all(record["minimum_deposit"] is None for record in records.values()))
+
+    def test_extracts_wagering_and_deposit_only_from_labeled_columns(self):
+        html = """
+        <table><tr><th>Casino</th><th>Welcome Bonus</th>
+          <th>Wagering Requirement</th><th>Minimum Deposit</th></tr>
+          <tr><td>Alpha</td><td>100% up to R1,000</td><td>35x bonus</td><td>R100</td></tr>
+        </table>
+        """
+        record = scraper.extract_bonus_table(html, ["Alpha"])["Alpha"]
+        self.assertEqual(record["wagering_requirement"], "35x")
+        self.assertEqual(record["minimum_deposit"], "R100")
+
+
 class ModelOutputTests(unittest.TestCase):
     def test_valid_output(self):
         raw = json.dumps({"welcome_bonus": "100% up to £200", "wagering_requirement": "35x bonus",

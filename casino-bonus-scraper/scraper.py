@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """BonusAtlas scraper.
 
-Pipeline: check robots.txt -> fetch page -> extract text -> find each casino's
-passage -> language model structures it -> validate -> write casinos.json safely.
+Pipeline: check robots.txt -> fetch page -> extract terms with the selected mode
+-> validate -> write casinos.json safely.
 
 Run:  python scraper.py --source-url https://example.com/page --casinos "A,B,C"
+(use --no-ai to extract only explicitly labeled bonus-table values)
 (or put SOURCE_URL / CASINO_NAMES / OPENAI_API_KEY in a .env file).
 """
 import argparse
@@ -125,6 +126,50 @@ def find_snippets(text, names, chars=SNIPPET_CHARS):
                 best, best_score = passage, score
         snippets[name] = best if best_score > 0 else None
     return snippets
+
+
+def extract_bonus_table(html, names):
+    """Extract named records from a table with explicit casino and bonus headers."""
+    soup = BeautifulSoup(html, "html.parser")
+    normalized_names = {re.sub(r"\s+", " ", name).strip().casefold(): name for name in names}
+    extracted = {}
+
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        for header_index, row in enumerate(rows):
+            header_cells = row.find_all(["th", "td"], recursive=False)
+            headers = [re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip().casefold()
+                       for cell in header_cells]
+            casino_index = next((i for i, h in enumerate(headers) if h in ("casino", "operator")), None)
+            bonus_index = next((i for i, h in enumerate(headers)
+                                if "welcome bonus" in h or h == "bonus"), None)
+            if casino_index is None or bonus_index is None:
+                continue
+
+            wagering_index = next((i for i, h in enumerate(headers) if "wager" in h), None)
+            deposit_index = next((i for i, h in enumerate(headers)
+                                  if "deposit" in h and ("minimum" in h or "min." in h)), None)
+            for data_row in rows[header_index + 1:]:
+                cells = data_row.find_all(["th", "td"], recursive=False)
+                values = [re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip() for cell in cells]
+                if max(casino_index, bonus_index) >= len(values):
+                    continue
+                casino_name = normalized_names.get(values[casino_index].casefold())
+                if casino_name is None:
+                    continue
+                bonus = values[bonus_index] or None
+                wagering = values[wagering_index] if wagering_index is not None and wagering_index < len(values) else ""
+                deposit = values[deposit_index] if deposit_index is not None and deposit_index < len(values) else ""
+                if wagering:
+                    wagering = "No wagering" if re.search(r"no wagering|wager[- ]free", wagering, re.I) else (
+                        find_wagering_multiplier(wagering)
+                    )
+                extracted[casino_name] = {
+                    "welcome_bonus": bonus,
+                    "wagering_requirement": wagering or None,
+                    "minimum_deposit": deposit or None,
+                }
+    return extracted
 
 
 # ---------- 3. Language-model structuring and validation ----------
@@ -319,18 +364,37 @@ def parse_names(raw):
     return names
 
 
-def run(source_url, names, output, model, user_agent, client=None, session=requests):
+def run(source_url, names, output, model, user_agent, client=None, session=requests, use_ai=True):
     """Return an exit code: 0 all complete, 2 written but incomplete, 1 failure."""
     if not validate_url(source_url):
         raise ScraperError("SOURCE_URL is missing or invalid. Set it in .env or pass --source-url.")
     if len(names) != 3:
         raise ScraperError(f"Exactly 3 casino names are required (got {len(names)}). Use --casinos 'A,B,C'.")
-    client = client or make_client()
+    if use_ai:
+        client = client or make_client()
     check_robots(source_url, user_agent, session)
-    text = extract_text(fetch_page(source_url, user_agent, session))
-    log.info("Fetched %d characters of text from %s", len(text), source_url)
-    snippets = find_snippets(text, names)
-    records = [process_casino(n, snippets[n], source_url, client, model) for n in names]
+    html = fetch_page(source_url, user_agent, session)
+    if use_ai:
+        text = extract_text(html)
+        log.info("Fetched %d characters of text from %s", len(text), source_url)
+        snippets = find_snippets(text, names)
+        records = [process_casino(n, snippets[n], source_url, client, model) for n in names]
+    else:
+        table_data = extract_bonus_table(html, names)
+        log.info("Fetched %d characters of HTML from %s", len(html), source_url)
+        records = []
+        for name in names:
+            fields = table_data.get(name)
+            if fields is None:
+                records.append(build_record(name, source_url,
+                                            notes="No matching casino row found in a table with explicit bonus headers."))
+                continue
+            missing = [label for key, label in (
+                ("wagering_requirement", "wagering requirement"),
+                ("minimum_deposit", "minimum deposit"),
+            ) if not fields.get(key)]
+            notes = ("The source table does not state " + " or ".join(missing) + ".") if missing else ""
+            records.append(build_record(name, source_url, fields, status_for(fields), notes))
     for r in records:
         log.info("%-25s %s", r["casino_name"], r["extraction_status"])
     if not write_json_safely(output, assemble_dataset(source_url, records)):
@@ -351,10 +415,13 @@ def main(argv=None):
     ap.add_argument("--output", default=DEFAULT_OUTPUT)
     ap.add_argument("--model", default=os.environ.get("OPENAI_MODEL", DEFAULT_MODEL))
     ap.add_argument("--user-agent", default=os.environ.get("USER_AGENT", DEFAULT_USER_AGENT))
+    ap.add_argument("--no-ai", action="store_true",
+                    help="extract only values in explicit casino bonus table columns; no API key required")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
-        return run(args.source_url, parse_names(args.casinos), args.output, args.model, args.user_agent)
+        return run(args.source_url, parse_names(args.casinos), args.output, args.model, args.user_agent,
+                   use_ai=not args.no_ai)
     except ScraperError as exc:
         log.error("%s", exc)
         return 1
