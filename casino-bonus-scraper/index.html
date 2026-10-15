@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BonusAtlas · Casino promotion data</title>
+  <meta name="description" content="BonusAtlas displays casino welcome bonus terms extracted from a public source.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#data">Skip to data</a>
+  <header class="site-header">
+    <div class="wrap bar">
+      <a class="brand" href="#top" aria-label="BonusAtlas home"><span class="logo" aria-hidden="true">◆</span> BonusAtlas</a>
+      <nav aria-label="Main"><a href="#data">Data</a><a href="#source">Source</a><a href="#responsible">Responsible use</a></nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="wrap hero">
+      <p class="eyebrow">Promotion data, structured</p>
+      <h1>Welcome-bonus terms, side by side.</h1>
+      <p class="lead">BonusAtlas reads public promotional text, uses a language model to pull out the bonus, wagering requirement and minimum deposit, and shows only what the source text supports. Missing terms stay empty instead of being guessed.</p>
+    </section>
+
+    <section class="wrap" aria-label="Summary">
+      <div class="summary">
+        <div class="stat"><span class="stat-label">Casino records</span><strong id="stat-total">–</strong></div>
+        <div class="stat"><span class="stat-label">Complete records</span><strong id="stat-complete">–</strong></div>
+        <div class="stat"><span class="stat-label">Last updated</span><strong id="stat-updated" class="small">–</strong></div>
+      </div>
+    </section>
+
+    <section class="wrap" id="data" aria-labelledby="data-title">
+      <div class="toolbar">
+        <h2 id="data-title">Casino offers</h2>
+        <div class="controls">
+          <label class="sr-only" for="search">Search casinos</label>
+          <input id="search" type="search" placeholder="Search casinos or terms…" autocomplete="off">
+          <button id="refresh" type="button" class="btn">Refresh data</button>
+        </div>
+      </div>
+
+      <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <div class="table-wrap" id="table-wrap" hidden>
+        <table>
+          <caption class="sr-only">Casino welcome bonus terms extracted from the source</caption>
+          <thead>
+            <tr><th scope="col">Casino</th><th scope="col">Welcome bonus</th><th scope="col">Wagering</th><th scope="col">Min. deposit</th><th scope="col">Status</th><th scope="col">Source</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="wrap panel" id="source" aria-labelledby="source-title">
+      <h2 id="source-title">Source attribution</h2>
+      <p id="source-text">No source recorded yet.</p>
+      <p class="muted">Terms are extracted automatically and may be out of date or misread. Source links are recorded from the scrape and have not been independently verified. Always confirm terms on the operator's own site.</p>
+    </section>
+
+    <section class="wrap panel" id="responsible" aria-labelledby="resp-title">
+      <h2 id="resp-title">Responsible use</h2>
+      <p>This site is informational only and is not an offer or recommendation. Gambling is for adults (18+ or the legal age where you live) and carries financial risk. Only play with money you can afford to lose. If gambling is a problem, contact a local support service.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© BonusAtlas — screening-assessment project. Data shown comes from <code>casinos.json</code>.</p>
+    </div>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
