@@ -61,8 +61,19 @@ class ModelOutputError(ScraperError):
 # ---------- 1. Source checks and fetching ----------
 
 def validate_url(url):
-    parts = urlparse(url or "")
-    return parts.scheme in ("http", "https") and bool(parts.netloc)
+    if not isinstance(url, str):
+        return False
+    try:
+        parts = urlparse(url)
+        return (
+            parts.scheme in ("http", "https")
+            and bool(parts.hostname)
+            and parts.username is None
+            and parts.password is None
+            and (parts.port is None or 1 <= parts.port <= 65535)
+        )
+    except ValueError:
+        return False
 
 
 def check_robots(url, user_agent, session=requests):
@@ -73,11 +84,13 @@ def check_robots(url, user_agent, session=requests):
         resp = session.get(robots_url, headers={"User-Agent": user_agent}, timeout=TIMEOUT_SECONDS)
     except requests.RequestException as exc:
         raise RobotsDisallowed(f"Could not read {robots_url} ({exc}); refusing to scrape without it.") from exc
-    if resp.status_code in (401, 403) or resp.status_code >= 500:
+    if resp.status_code in (401, 403) or resp.status_code == 429 or resp.status_code >= 500:
         raise RobotsDisallowed(f"{robots_url} returned HTTP {resp.status_code}; refusing to scrape.")
-    if resp.status_code >= 400:  # e.g. 404: no robots.txt means no stated restrictions
+    if resp.status_code in (404, 410):  # No published robots.txt means no stated restrictions.
         log.info("No robots.txt found (HTTP %s); continuing.", resp.status_code)
         return
+    if resp.status_code >= 400:
+        raise RobotsDisallowed(f"Could not read {robots_url} (HTTP {resp.status_code}); refusing to scrape.")
     parser = RobotFileParser()
     parser.parse(resp.text.splitlines())
     if not parser.can_fetch(user_agent, url):
@@ -296,6 +309,17 @@ def validate_dataset(data):
     for key in ("last_updated", "source_url", "casinos"):
         if key not in data:
             errors.append(f"Missing top-level key '{key}'.")
+    if not isinstance(data.get("last_updated"), str):
+        errors.append("'last_updated' must be an ISO 8601 timestamp.")
+    else:
+        try:
+            updated = datetime.fromisoformat(data["last_updated"].replace("Z", "+00:00"))
+            if updated.tzinfo is None or updated.utcoffset() is None:
+                errors.append("'last_updated' must include a timezone.")
+        except ValueError:
+            errors.append("'last_updated' must be an ISO 8601 timestamp.")
+    if not validate_url(data.get("source_url")):
+        errors.append("Top-level 'source_url' is invalid.")
     if not isinstance(data.get("casinos"), list):
         return errors + ["'casinos' must be a list."]
     seen = set()
@@ -313,6 +337,10 @@ def validate_dataset(data):
         elif name in seen:
             errors.append(f"Duplicate casino '{rec['casino_name']}'.")
         seen.add(name)
+        if not isinstance(rec.get("casino_name"), str):
+            errors.append(f"Record {i} field 'casino_name' must be a string.")
+        if not isinstance(rec.get("notes"), str):
+            errors.append(f"Record {i} field 'notes' must be a string.")
         for key in FIELDS:
             if rec.get(key) is not None and not isinstance(rec[key], str):
                 errors.append(f"Record {i} field '{key}' must be a string or null.")

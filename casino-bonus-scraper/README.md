@@ -21,9 +21,9 @@ The scraper does not run in the browser. The website only reads `casinos.json`; 
 - Matches casino names in page text and separates passages to reduce mixing offers between casinos.
 - Uses the official OpenAI Python SDK in JSON mode to extract three fields.
 - Offers a `--no-ai` mode that reads welcome bonuses, wagering, and minimum deposits only from explicitly labeled table columns; it requires no API key.
-- Checks extracted numbers against the source passage and changes unsupported values to `null`.
+- In AI mode, checks extracted numbers against the source passage and changes unsupported values to `null`.
 - Validates records before writing; failed or unusable runs leave existing data untouched. Valid output is written atomically.
-- Provides a responsive static page with search, refresh, record status, source links, and empty/error states.
+- Provides a responsive static page with search, refresh, record status, source links, and empty/error states. It does not expose the full operator terms and should not be treated as current wagering or deposit advice.
 
 ## Requirements
 
@@ -53,7 +53,7 @@ CASINO_NAMES=Casino A,Casino B,Casino C
 
 `.env` is ignored by Git. Keep your API key out of source code, screenshots, and public repositories.
 
-Before choosing a source, read its terms and check `https://<host>/robots.txt`. The scraper also checks robots.txt itself; it refuses when the file disallows access or cannot be read. A `404` is treated as no published robots.txt restrictions. Do not use login-only pages or attempt to bypass CAPTCHAs or other anti-bot controls.
+Before choosing a source, read its terms and check `https://<host>/robots.txt`. The scraper also checks robots.txt itself; it refuses when the file disallows access or cannot be read. HTTP `404` or `410` is treated as no published robots.txt restrictions. Do not use login-only pages or attempt to bypass CAPTCHAs or other anti-bot controls.
 
 ## Run the scraper
 
@@ -130,6 +130,7 @@ GitHub Pages can host the front end, but it cannot run the Python scraper or kee
 ## Limitations and responsible use
 
 - A live no-AI extraction has been verified against Casino.com's South African casino bonuses page. Its robots.txt allows the page path; the legacy terms-and-conditions URL redirects to the About page, which includes an affiliate disclosure, and no standalone terms-of-use page was found. No live OpenAI request has been made.
+- The listed source is South African and shows prices in rand where provided. That does not verify that operators accept South African residents, hold applicable licences, or make each promotion available to a particular visitor. Confirm those details with the operator; the dashboard does not perform location or eligibility checks.
 - Only static HTML pages are supported. JavaScript-rendered offers are not fetched.
 - Casino matching depends on names appearing in the page text. Unusual page layouts may result in `not_found` or partial records.
 - Model output can still misread terms. The number check is a safeguard, not proof of accuracy; verify each offer against the linked operator page.

@@ -1,6 +1,6 @@
 # BonusAtlas – Casino Bonus Scraper
 
-A small Python project that checks a public casino promotions page, extracts the relevant promo text for three named casinos, validates the data with an OpenAI-powered extraction step, and saves the result as a structured JSON dataset for a static front-end display.
+A small Python project that checks a public casino promotions page and saves supported offer terms as JSON for a static front end. Extraction can use an OpenAI-powered mode or a deterministic no-API mode that reads explicitly labeled table columns.
 
 This project is designed to solve one specific problem: comparing casino bonus offers across multiple operators without inventing values that are not actually stated in the source text.
 
@@ -9,11 +9,12 @@ This project is designed to solve one specific problem: comparing casino bonus o
 - Fetches a public source page and confirms the host allows automated access via `robots.txt`
 - Uses a polite `User-Agent` and timeout-based requests
 - Extracts readable text from the page and isolates the section associated with each casino
-- Sends that text to the OpenAI API in JSON mode to extract:
+- Extracts these fields using AI or explicit source-table labels:
   - `welcome_bonus`
   - `wagering_requirement`
   - `minimum_deposit`
-- Rejects unsupported or hallucinated values by checking that numbers appear in the original text
+- In AI mode, rejects unsupported values when extracted numbers do not appear in the matched source text
+- Leaves terms blank when the source does not state them
 - Writes the data safely to `casinos.json`
 - Shows the results in a lightweight static website that reads the JSON and renders it in a table
 
@@ -26,6 +27,9 @@ Casino promotion text is messy and inconsistent. Each operator presents offers d
 ```text
 .
 ├── README.md
+├── .github/
+│   └── workflows/
+│       └── tests.yml
 └── casino-bonus-scraper/
     ├── scraper.py
     ├── index.html
@@ -37,6 +41,7 @@ Casino promotion text is messy and inconsistent. Each operator presents offers d
     ├── tests/
     ├── production-plan.md
     ├── AI_REFLECTION.md
+    ├── SUBMISSION.md
     └── LICENSE
 ```
 
@@ -52,7 +57,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Then set your environment values in `.env`:
+For AI-assisted extraction, set your environment values in `.env`:
 
 ```env
 OPENAI_API_KEY=your_key_here
@@ -67,7 +72,13 @@ Run the scraper:
 python scraper.py
 ```
 
-The scraper saves structured results to `casinos.json`.
+Without an API key, use table-only extraction:
+
+```bash
+python scraper.py --no-ai --source-url "https://example.com/promotions" --casinos "Casino A,Casino B,Casino C"
+```
+
+The scraper saves structured results to `casinos.json`. Check the source's terms and `robots.txt` before scraping; the scraper enforces robots rules but cannot determine whether your use is otherwise permitted.
 
 ## View the website
 
@@ -130,8 +141,14 @@ The JSON output includes a dataset-level summary plus per-casino records:
 python -m unittest discover -s tests -t . -v
 ```
 
-The test suite exercises parsing and output behavior without requiring network access or a live OpenAI key.
+The test suite exercises parsing and output behavior without requiring network access or an OpenAI key.
+
+## Live dataset
+
+The deployed example uses [Casino.com's South African bonuses page](https://www.casino.com/zar/bonuses/). The page states welcome bonuses for Jackpot City, YesPlay, and Jabulabets but does not state their casino-specific wagering requirements or minimum deposits. Those fields are intentionally left empty. The deployed copy is available at <https://tonnyvukosi271.github.io/casino-bonus-scraper/>.
+
+The public GitHub Pages URL and dataset returned HTTP 200 when checked on 2026-10-15. This verifies that the site is publicly reachable from the check environment, not that it has been tested from a South African network or that any listed casino accepts South African residents. The source market is South Africa; verify operator availability, licensing, and offer eligibility directly.
 
 ## Notes
 
-This repository is a focused proof-of-concept scraper and dashboard, not a production casino-data platform. It is intentionally conservative: if a value cannot be proven from the source text, it is left as `null` rather than guessed.
+This repository is a focused proof-of-concept scraper and dashboard, not a production casino-data platform. Offers can change, source terms may restrict reuse, and automated extraction can be wrong; verify current terms with each operator and follow local laws. If a value cannot be supported by the source text, it is left as `null` rather than guessed.

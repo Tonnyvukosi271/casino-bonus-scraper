@@ -4,8 +4,25 @@
 
 const DATA_URL = "casinos.json";
 const STATUS_LABELS = { complete: "Complete", partial: "Partial", not_found: "Not found", failed: "Failed" };
+const RECORD_FIELDS = ["welcome_bonus", "wagering_requirement", "minimum_deposit"];
 const $ = (id) => document.getElementById(id);
 let casinos = [];
+
+function isRecord(record) {
+  return record !== null && typeof record === "object" && !Array.isArray(record) &&
+    typeof record.casino_name === "string" &&
+    RECORD_FIELDS.every((field) => record[field] === null || typeof record[field] === "string") &&
+    typeof record.source_url === "string" &&
+    Object.hasOwn(STATUS_LABELS, record.extraction_status) &&
+    typeof record.notes === "string";
+}
+
+function isDataset(data) {
+  return data !== null && typeof data === "object" && !Array.isArray(data) &&
+    Array.isArray(data.casinos) && data.casinos.every(isRecord) &&
+    typeof data.source_url === "string" &&
+    (data.last_updated === null || typeof data.last_updated === "string");
+}
 
 function showMessage(title, body, kind) {
   const box = $("message");
@@ -129,7 +146,7 @@ async function loadData() {
     const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    if (!data || !Array.isArray(data.casinos)) throw new Error("Unexpected JSON structure");
+    if (!isDataset(data)) throw new Error("Unexpected JSON structure or invalid casino record");
     casinos = data.casinos;
     renderSummary(data);
     renderTable();

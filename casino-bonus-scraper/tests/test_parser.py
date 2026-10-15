@@ -175,6 +175,11 @@ class FetchTests(unittest.TestCase):
         scraper.check_robots(self.URL, "ua", FakeSession({"https://example.com/robots.txt": FakeResponse("User-agent: *\nDisallow:")}))
         scraper.check_robots(self.URL, "ua", FakeSession())  # 404 -> allowed
 
+    def test_robots_rate_limit_refuses(self):
+        session = FakeSession({"https://example.com/robots.txt": FakeResponse("", 429)})
+        with self.assertRaises(scraper.RobotsDisallowed):
+            scraper.check_robots(self.URL, "ua", session)
+
     def test_robots_unreachable_refuses(self):
         with self.assertRaises(scraper.RobotsDisallowed):
             scraper.check_robots(self.URL, "ua", FakeSession(error=requests.Timeout("slow")))
@@ -204,3 +209,10 @@ class RegressionTests(unittest.TestCase):
         snip = scraper.find_snippets(text, ["Alpha", "Beta", "Gamma"])
         self.assertTrue(snip["Alpha"].startswith("Alpha: 200%"))
         self.assertIsNone(snip["Beta"])
+
+    def test_url_validation_rejects_credentials_and_invalid_ports(self):
+        self.assertFalse(scraper.validate_url("https://user:password@example.com/promos"))
+        self.assertFalse(scraper.validate_url("https://example.com:bad/promos"))
+        self.assertFalse(scraper.validate_url("file:///tmp/promos"))
+        self.assertFalse(scraper.validate_url(123))
+        self.assertTrue(scraper.validate_url("https://example.com/promos"))

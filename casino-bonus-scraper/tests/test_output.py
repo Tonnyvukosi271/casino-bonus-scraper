@@ -43,6 +43,19 @@ class DatasetTests(unittest.TestCase):
         for expected in ("Duplicate", "invalid source_url", "missing 'notes'", "must be a string"):
             self.assertIn(expected, errors)
 
+    def test_rejects_invalid_dataset_timestamp_and_source(self):
+        data = good_dataset()
+        data["last_updated"] = "yesterday"
+        data["source_url"] = ""
+        errors = " | ".join(scraper.validate_dataset(data))
+        self.assertIn("ISO 8601 timestamp", errors)
+        self.assertIn("Top-level 'source_url' is invalid", errors)
+
+    def test_rejects_timestamp_without_timezone(self):
+        data = good_dataset()
+        data["last_updated"] = "2026-10-15T12:00:00"
+        self.assertIn("must include a timezone", " ".join(scraper.validate_dataset(data)))
+
     def test_timestamp_is_iso8601(self):
         from datetime import datetime
         datetime.fromisoformat(good_dataset()["last_updated"])
